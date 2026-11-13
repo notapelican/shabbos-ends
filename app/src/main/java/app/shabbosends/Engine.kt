@@ -63,9 +63,9 @@ object Engine {
         val tz = place.timeZone
         // Name the day whenever it is not simply "tomorrow night".
         val endDay = if (span.days > 1 || !span.endsOnShabbos) day(span.ends, tz) + " " else ""
-        val title = "${span.label} $endDay${time(context, span.ends, tz, true)}"
-        val text = "Candle lighting ${day(span.candleLighting, tz)} " +
-            "${time(context, span.candleLighting, tz, true)} · ${place.name}"
+        // Kept short so the Now Bar shows all of it: "Shabbos ends 5:22", "Candles Fri 4:21".
+        val title = "${span.label} $endDay${time(context, span.ends, tz, false)}"
+        val text = "Candles ${day(span.candleLighting, tz)} ${time(context, span.candleLighting, tz, false)}"
 
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java),
@@ -76,7 +76,6 @@ object Engine {
             .setSmallIcon(R.drawable.ic_stat_stars)
             .setContentTitle(title)
             .setContentText(text)
-            .setStyle(Notification.BigTextStyle().bigText(text))
             .setContentIntent(open)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
