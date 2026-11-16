@@ -45,6 +45,7 @@ class MainActivity : Activity() {
     private lateinit var tzField: EditText
     private lateinit var israelBox: CheckBox
     private lateinit var routineBox: LinearLayout
+    private lateinit var followBox: LinearLayout
     private lateinit var upcomingView: TextView
 
     private var textColor = 0
@@ -88,7 +89,7 @@ class MainActivity : Activity() {
             addView(label("LOCATION"))
             placeLabel = text("").also(::addView)
             searchField = EditText(context).apply {
-                hint = "Search a town, suburb or postcode"
+                hint = "Search a suburb, town, address or postcode"
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
                 isSingleLine = true
                 imeOptions = EditorInfo.IME_ACTION_SEARCH
@@ -133,7 +134,19 @@ class MainActivity : Activity() {
         })
 
         page.addView(card {
-            addView(label("SHABBOS MODE"))
+            addView(label("COMING UP"))
+            upcomingView = text("").also(::addView)
+        })
+
+        // Optional, and last on the page: most people never need it.
+        page.addView(card {
+            addView(label("OPTIONAL: SHABBOS AUTOMATION"))
+            addView(text(
+                "For people who set their phone up for Shabbos automatically: flight mode on, " +
+                    "Always On Display on, and so on. The app sends a signal at the right times, " +
+                    "on Yom Tov as well, and a Samsung routine that you make does the switching."
+            ))
+            addView(hint("If you don't do this, leave it off. The card works without it."))
             addView(Switch(context).apply {
                 text = "Signal Samsung Routines"
                 textSize = 16f
@@ -144,7 +157,6 @@ class MainActivity : Activity() {
                     resync()
                 }
             })
-            addView(hint("Lets a Samsung routine switch on flight mode at the right time, on Yom Tov as well."))
             routineBox = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 visibility = if (prefs.routinesEnabled) View.VISIBLE else View.GONE
@@ -162,19 +174,42 @@ class MainActivity : Activity() {
                     "Routine 2, keyword \"${Engine.END_TITLE}\": flight mode off, and the rest put back."
             ), spaced())
             routineBox.addView(button("Send the start signal now") {
-                Engine.postTrigger(context, start = true)
+                Engine.postTrigger(context, Engine.START_TITLE)
                 toast("Sent: ${Engine.START_TITLE}")
             }, spaced())
             routineBox.addView(button("Send the end signal now") {
-                Engine.postTrigger(context, start = false)
+                Engine.postTrigger(context, Engine.END_TITLE)
                 toast("Sent: ${Engine.END_TITLE}")
             })
-            addView(routineBox)
-        })
 
-        page.addView(card {
-            addView(label("COMING UP"))
-            upcomingView = text("").also(::addView)
+            // Optional third signal, some time after Shabbos has ended.
+            routineBox.addView(Switch(context).apply {
+                text = "Send a later follow-up signal"
+                textSize = 16f
+                isChecked = prefs.followEnabled
+                setOnCheckedChangeListener { _, on ->
+                    prefs.followEnabled = on
+                    followBox.visibility = if (on) View.VISIBLE else View.GONE
+                    resync()
+                }
+            }, spaced(16))
+            followBox = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = if (prefs.followEnabled) View.VISIBLE else View.GONE
+            }
+            followBox.addView(numberRow("Follow-up, minutes after Shabbos ends", prefs.followMinutes, 0, 720) {
+                prefs.followMinutes = it
+            })
+            followBox.addView(text(
+                "Routine 3, keyword \"${Engine.FOLLOW_TITLE}\": whatever should happen later, " +
+                    "such as Always On Display off."
+            ), spaced())
+            followBox.addView(button("Send the follow-up signal now") {
+                Engine.postTrigger(context, Engine.FOLLOW_TITLE)
+                toast("Sent: ${Engine.FOLLOW_TITLE}")
+            }, spaced())
+            routineBox.addView(followBox)
+            addView(routineBox)
         })
 
         fillManual(prefs.place)
@@ -221,8 +256,28 @@ class MainActivity : Activity() {
                     hits == null -> resultsBox.addView(hint("Couldn't search. Check the connection and try again."))
                     hits.isEmpty() -> resultsBox.addView(hint("Nothing found. Try a nearby town or a postcode."))
                     else -> hits.forEach { hit ->
-                        resultsBox.addView(link(hit.label) { choose(hit.place) })
+                        resultsBox.addView(result(hit.title, hit.detail) { pick(hit) })
                     }
+                }
+            }
+        }.start()
+    }
+
+    /** A search result was tapped. Finds its time zone if the search didn't give one. */
+    private fun pick(hit: Geocoder.Hit) {
+        if (hit.tzId != null) {
+            return choose(Place(hit.title, hit.lat, hit.lng, hit.tzId, hit.inIsrael))
+        }
+        resultsBox.removeAllViews()
+        resultsBox.addView(hint("Setting location…"))
+        Thread {
+            val found = Geocoder.timeZoneAt(hit.lat, hit.lng)
+            runOnUiThread {
+                val tz = found ?: java.util.TimeZone.getDefault().id
+                choose(Place(hit.title, hit.lat, hit.lng, tz, hit.inIsrael))
+                if (found == null) {
+                    toast("Couldn't look up the time zone, so the phone's own ($tz) is used. Check it below.")
+                    manualBox.visibility = View.VISIBLE
                 }
             }
         }.start()
@@ -272,7 +327,7 @@ class MainActivity : Activity() {
         val spans = ShabbosCalc.upcoming(place, Date(), 8, prefs.candleMinutes)
         val next = spans.firstOrNull()
 
-        placeLabel.text = place.name + if (place.inIsrael) " (Israel)" else ""
+        placeLabel.text = place.name + (if (place.inIsrael) " (Israel)" else "") + "\n" + place.tzId
 
         if (next == null) {
             heroTitle.text = "No times found"
@@ -387,6 +442,25 @@ class MainActivity : Activity() {
         textSize = 16f
         setTextColor(accentColor)
         setPadding(0, dp(12), 0, dp(12))
+        setOnClickListener(onClick)
+    }
+
+    /** A search result: the place in large type, where it is underneath. */
+    private fun result(title: String, detail: String, onClick: (View) -> Unit) = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(0, dp(10), 0, dp(10))
+        addView(TextView(context).apply {
+            text = title
+            textSize = 16f
+            setTextColor(accentColor)
+        })
+        if (detail.isNotEmpty()) {
+            addView(TextView(context).apply {
+                text = detail
+                textSize = 13f
+                alpha = 0.7f
+            })
+        }
         setOnClickListener(onClick)
     }
 

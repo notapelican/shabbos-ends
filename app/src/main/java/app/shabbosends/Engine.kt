@@ -21,9 +21,10 @@ import java.util.TimeZone
 object Engine {
     const val ACTION_SYNC = "app.shabbosends.SYNC"
 
-    /** Samsung Routines watches for these two titles. */
+    /** Samsung Routines watches for these titles. None is contained in another. */
     const val START_TITLE = "Shabbos mode starting"
     const val END_TITLE = "Shabbos mode ending"
+    const val FOLLOW_TITLE = "Shabbos mode follow-up"
 
     private const val CARD_CHANNEL = "shabbos_ends"
     private const val TRIGGER_CHANNEL = "routine_triggers"
@@ -31,6 +32,7 @@ object Engine {
     private const val TEST_ID = 2
     private const val START_ID = 3
     private const val END_ID = 4
+    private const val FOLLOW_ID = 5
     private const val MINUTE = 60_000L
     private const val DAY = 24 * 60 * MINUTE
 
@@ -64,23 +66,33 @@ object Engine {
             wakeAt(current.ends.time + 1000)
         }
 
-        // The two triggers for Samsung Routines, each sent once per Shabbos or Yom Tov.
+        // The triggers for Samsung Routines, each sent once per Shabbos or Yom Tov.
         if (prefs.routinesEnabled) {
             for (span in spans) {
                 val id = span.ends.time
                 val startAt = span.candleLighting.time - prefs.modeOnMinutes * MINUTE
                 val endAt = span.ends.time + prefs.modeOffMinutes * MINUTE
                 if (now >= startAt && now < span.ends.time && prefs.lastOn != id) {
-                    postTrigger(context, start = true)
+                    postTrigger(context, START_TITLE)
                     prefs.lastOn = id
                 }
                 // Only undo a mode this app switched on.
                 if (now >= endAt && prefs.lastOn == id && prefs.lastOff != id) {
-                    postTrigger(context, start = false)
+                    postTrigger(context, END_TITLE)
                     prefs.lastOff = id
                 }
                 wakeAt(startAt)
                 wakeAt(endAt)
+
+                // Optional later signal, for things to do once Shabbos is well over.
+                if (prefs.followEnabled) {
+                    val followAt = span.ends.time + prefs.followMinutes * MINUTE
+                    if (now >= followAt && prefs.lastOn == id && prefs.lastFollow != id) {
+                        postTrigger(context, FOLLOW_TITLE)
+                        prefs.lastFollow = id
+                    }
+                    wakeAt(followAt)
+                }
             }
         }
 
@@ -99,26 +111,30 @@ object Engine {
     }
 
     /** A short-lived, silent notification whose only job is to set off a Samsung routine. */
-    fun postTrigger(context: Context, start: Boolean) {
+    fun postTrigger(context: Context, title: String) {
         val nm = context.getSystemService(NotificationManager::class.java)
         ensureChannels(nm)
         val notification = Notification.Builder(context, TRIGGER_CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_stars)
-            .setContentTitle(if (start) START_TITLE else END_TITLE)
+            .setContentTitle(title)
             .setContentText("Signal for Samsung Routines")
             .setShowWhen(false)
             .setTimeoutAfter(2 * MINUTE)
             .build()
-        nm.notify(if (start) START_ID else END_ID, notification)
+        val id = when (title) {
+            START_TITLE -> START_ID
+            END_TITLE -> END_ID
+            else -> FOLLOW_ID
+        }
+        nm.notify(id, notification)
     }
 
     fun buildCard(context: Context, place: Place, span: Span, lifetimeMillis: Long): Notification {
         val tz = place.timeZone
         // Name the day whenever it is not simply "tomorrow night".
         val endDay = if (span.days > 1 || !span.endsOnShabbos) day(span.ends, tz) + " " else ""
-        // Kept short so the Now Bar shows all of it: "Shabbos ends 5:22", "Candles Fri 4:21".
+        // One short line and nothing else, so the Now Bar shows all of it: "Shabbos ends 5:22".
         val title = "${span.label} $endDay${time(context, span.ends, tz, false)}"
-        val text = "Candles ${day(span.candleLighting, tz)} ${time(context, span.candleLighting, tz, false)}"
 
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java),
@@ -128,7 +144,6 @@ object Engine {
         return Notification.Builder(context, CARD_CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_stars)
             .setContentTitle(title)
-            .setContentText(text)
             .setContentIntent(open)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

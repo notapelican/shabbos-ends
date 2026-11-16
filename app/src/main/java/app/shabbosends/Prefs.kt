@@ -60,6 +60,21 @@ class Prefs(context: Context) {
         get() = sp.getLong("lastOff", 0)
         set(v) { sp.edit().putLong("lastOff", v).apply() }
 
+    /** Whether to send a third, later signal after Shabbos ends. */
+    var followEnabled: Boolean
+        get() = sp.getBoolean("follow", false)
+        set(v) { sp.edit().putBoolean("follow", v).apply() }
+
+    /** Minutes after Shabbos ends for the "follow-up" trigger. */
+    var followMinutes: Int
+        get() = sp.getInt("followMin", 30)
+        set(v) { sp.edit().putInt("followMin", v).apply() }
+
+    /** End time of the last Shabbos or Yom Tov the "follow-up" trigger fired for. */
+    var lastFollow: Long
+        get() = sp.getLong("lastFollow", 0)
+        set(v) { sp.edit().putLong("lastFollow", v).apply() }
+
     var askedForNotifications: Boolean
         get() = sp.getBoolean("askedNotif", false)
         set(v) { sp.edit().putBoolean("askedNotif", v).apply() }

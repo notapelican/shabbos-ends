@@ -47,7 +47,11 @@ Settings > Developer options > **Live notifications for all apps** and try again
 - It reschedules itself after a reboot, a clock or time zone change, and an
   app update.
 
-## Switching the phone into Shabbos mode
+## Optional: Shabbos automation
+
+This part is only for people who set their phone up for Shabbos automatically
+(flight mode on, Always On Display on, and so on). It is off by default and the
+card works without it.
 
 The app can't turn on flight mode itself, but Samsung Routines can, and the app
 can tell it when. Turn on **Signal Samsung Routines** in the app, then make two
@@ -63,8 +67,13 @@ a set time after Shabbos or Yom Tov ends. Each is a silent notification that
 disappears after two minutes. The two buttons in the app send them on demand,
 for testing the routines.
 
-The end signal is only sent for a Shabbos or Yom Tov the app sent a start
-signal for.
+There is an optional third signal, **Send a later follow-up signal**, sent a
+set time after Shabbos ends (30 minutes by default). Its keyword is
+`Shabbos mode follow-up`. Use it for a routine that should run later than the
+end routine, such as turning the Always On Display off.
+
+The end and follow-up signals are only sent for a Shabbos or Yom Tov the app
+sent a start signal for.
 
 ## The times
 
@@ -77,6 +86,9 @@ Calculation is by the KosherJava zmanim library. The logic is in
 
 ## Place search
 
-Search uses Open-Meteo's free geocoding service, built on the open GeoNames
-database. It finds towns, neighbourhoods and postcodes, not street addresses,
-and supplies the time zone. Coordinates can also be entered by hand.
+Search uses OpenStreetMap (the Nominatim service), so it finds suburbs, towns,
+addresses and postcodes and describes each result in full, for example
+"Crown Heights: Brooklyn, Kings County, New York, United States". The time
+zone for the chosen place comes from Open-Meteo. If OpenStreetMap can't be
+reached, search falls back to Open-Meteo's simpler place list. Coordinates can
+also be entered by hand.
