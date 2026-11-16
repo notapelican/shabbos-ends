@@ -20,43 +20,96 @@ import java.util.TimeZone
  */
 object Engine {
     const val ACTION_SYNC = "app.shabbosends.SYNC"
-    private const val CHANNEL = "shabbos_ends"
+
+    /** Samsung Routines watches for these two titles. */
+    const val START_TITLE = "Shabbos mode starting"
+    const val END_TITLE = "Shabbos mode ending"
+
+    private const val CARD_CHANNEL = "shabbos_ends"
+    private const val TRIGGER_CHANNEL = "routine_triggers"
     private const val CARD_ID = 1
     private const val TEST_ID = 2
+    private const val START_ID = 3
+    private const val END_ID = 4
     private const val MINUTE = 60_000L
+    private const val DAY = 24 * 60 * MINUTE
 
     fun sync(context: Context) {
         val prefs = Prefs(context)
         val nm = context.getSystemService(NotificationManager::class.java)
-        ensureChannel(nm)
+        ensureChannels(nm)
 
         val now = System.currentTimeMillis()
-        val span = ShabbosCalc.upcoming(prefs.place, Date(now), 1, prefs.candleMinutes).firstOrNull()
-        if (span == null) {
-            nm.cancel(CARD_ID)
-            return
+        // Look back a week so a Shabbos that has just ended is still in the list,
+        // even if the phone was switched off when it ended.
+        val spans = ShabbosCalc.upcoming(prefs.place, Date(now - 7 * DAY), 5, prefs.candleMinutes)
+
+        var next = Long.MAX_VALUE
+        fun wakeAt(time: Long) {
+            if (time > now && time < next) next = time
         }
 
-        val showAt = span.candleLighting.time - prefs.leadMinutes * MINUTE
-        if (now >= showAt) {
-            nm.notify(CARD_ID, buildCard(context, prefs.place, span, span.ends.time - now))
-            // Wake once more when it is over, to clear the card and line up next week.
-            schedule(context, span.ends.time + 1000)
-        } else {
+        // The card.
+        val current = spans.firstOrNull { it.ends.time > now }
+        if (current == null) {
             nm.cancel(CARD_ID)
-            schedule(context, showAt)
+        } else {
+            val showAt = current.candleLighting.time - prefs.leadMinutes * MINUTE
+            if (now >= showAt) {
+                nm.notify(CARD_ID, buildCard(context, prefs.place, current, current.ends.time - now))
+            } else {
+                nm.cancel(CARD_ID)
+            }
+            wakeAt(showAt)
+            wakeAt(current.ends.time + 1000)
         }
+
+        // The two triggers for Samsung Routines, each sent once per Shabbos or Yom Tov.
+        if (prefs.routinesEnabled) {
+            for (span in spans) {
+                val id = span.ends.time
+                val startAt = span.candleLighting.time - prefs.modeOnMinutes * MINUTE
+                val endAt = span.ends.time + prefs.modeOffMinutes * MINUTE
+                if (now >= startAt && now < span.ends.time && prefs.lastOn != id) {
+                    postTrigger(context, start = true)
+                    prefs.lastOn = id
+                }
+                // Only undo a mode this app switched on.
+                if (now >= endAt && prefs.lastOn == id && prefs.lastOff != id) {
+                    postTrigger(context, start = false)
+                    prefs.lastOff = id
+                }
+                wakeAt(startAt)
+                wakeAt(endAt)
+            }
+        }
+
+        if (next != Long.MAX_VALUE) schedule(context, next)
     }
 
     /** Posts the next card for five minutes, to see how the phone displays it. */
     fun postTest(context: Context): Boolean {
         val prefs = Prefs(context)
         val nm = context.getSystemService(NotificationManager::class.java)
-        ensureChannel(nm)
+        ensureChannels(nm)
         val span = ShabbosCalc.upcoming(prefs.place, Date(), 1, prefs.candleMinutes).firstOrNull()
             ?: return false
         nm.notify(TEST_ID, buildCard(context, prefs.place, span, 5 * MINUTE))
         return true
+    }
+
+    /** A short-lived, silent notification whose only job is to set off a Samsung routine. */
+    fun postTrigger(context: Context, start: Boolean) {
+        val nm = context.getSystemService(NotificationManager::class.java)
+        ensureChannels(nm)
+        val notification = Notification.Builder(context, TRIGGER_CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_stars)
+            .setContentTitle(if (start) START_TITLE else END_TITLE)
+            .setContentText("Signal for Samsung Routines")
+            .setShowWhen(false)
+            .setTimeoutAfter(2 * MINUTE)
+            .build()
+        nm.notify(if (start) START_ID else END_ID, notification)
     }
 
     fun buildCard(context: Context, place: Place, span: Span, lifetimeMillis: Long): Notification {
@@ -72,7 +125,7 @@ object Engine {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        return Notification.Builder(context, CHANNEL)
+        return Notification.Builder(context, CARD_CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_stars)
             .setContentTitle(title)
             .setContentText(text)
@@ -90,13 +143,22 @@ object Engine {
             .build()
     }
 
-    private fun ensureChannel(nm: NotificationManager) {
-        if (nm.getNotificationChannel(CHANNEL) != null) return
-        val channel = NotificationChannel(CHANNEL, "Shabbos ends", NotificationManager.IMPORTANCE_LOW)
-        channel.description = "The card showing when Shabbos or Yom Tov ends"
-        channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-        channel.setShowBadge(false)
-        nm.createNotificationChannel(channel)
+    private fun ensureChannels(nm: NotificationManager) {
+        if (nm.getNotificationChannel(CARD_CHANNEL) == null) {
+            val card = NotificationChannel(CARD_CHANNEL, "Shabbos ends", NotificationManager.IMPORTANCE_LOW)
+            card.description = "The card showing when Shabbos or Yom Tov ends"
+            card.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            card.setShowBadge(false)
+            nm.createNotificationChannel(card)
+        }
+        if (nm.getNotificationChannel(TRIGGER_CHANNEL) == null) {
+            val trigger = NotificationChannel(
+                TRIGGER_CHANNEL, "Routine triggers", NotificationManager.IMPORTANCE_LOW,
+            )
+            trigger.description = "Brief signals that start and stop a Samsung routine"
+            trigger.setShowBadge(false)
+            nm.createNotificationChannel(trigger)
+        }
     }
 
     private fun schedule(context: Context, atMillis: Long) {

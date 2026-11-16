@@ -5,117 +5,239 @@ import android.app.Activity
 import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.Editable
 import android.text.InputType
+import android.text.TextWatcher
+import android.view.Gravity
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import java.util.Date
 
 class MainActivity : Activity() {
     private lateinit var prefs: Prefs
+
+    private lateinit var heroTitle: TextView
+    private lateinit var heroDetail: TextView
+    private lateinit var setupBox: LinearLayout
+    private lateinit var placeLabel: TextView
+    private lateinit var searchField: EditText
+    private lateinit var searchButton: Button
+    private lateinit var resultsBox: LinearLayout
+    private lateinit var manualBox: LinearLayout
     private lateinit var nameField: EditText
     private lateinit var latField: EditText
     private lateinit var lngField: EditText
     private lateinit var tzField: EditText
     private lateinit var israelBox: CheckBox
-    private lateinit var candleField: EditText
-    private lateinit var leadField: EditText
-    private lateinit var statusView: TextView
+    private lateinit var routineBox: LinearLayout
     private lateinit var upcomingView: TextView
+
+    private var textColor = 0
+    private var accentColor = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
+        textColor = themeColor(android.R.attr.textColorPrimary)
+        accentColor = themeColor(android.R.attr.colorAccent)
 
-        val column = LinearLayout(this).apply {
+        val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            val pad = dp(20)
-            setPadding(pad, pad, pad, pad)
+            setPadding(dp(16), dp(8), dp(16), dp(32))
         }
         setContentView(ScrollView(this).apply {
             fitsSystemWindows = true
-            addView(column)
+            addView(page)
         })
 
-        val signedDecimal = InputType.TYPE_CLASS_NUMBER or
-            InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
-
-        column.addView(heading("Upcoming"))
-        upcomingView = body().also(column::addView)
-
-        column.addView(heading("Status"))
-        statusView = body().also(column::addView)
-        column.addView(button("Show a test card for 5 minutes") {
-            val ok = Engine.postTest(this)
-            toast(if (ok) "Test card sent. Lock the phone to check the Now Bar." else "No upcoming times found")
-        })
-        column.addView(button("Allow notifications") {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
-        })
-        column.addView(button("Live Update setting") {
-            open(
-                Intent(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
-                    .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-            )
-        })
-        column.addView(button("Turn off battery restrictions") {
-            open(
-                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                    .setData(Uri.parse("package:$packageName"))
-            )
+        // What is coming up, front and centre.
+        page.addView(card {
+            addView(label("NEXT"))
+            heroTitle = TextView(context).apply {
+                textSize = 28f
+                typeface = Typeface.DEFAULT_BOLD
+            }
+            addView(heroTitle)
+            heroDetail = text("").also(::addView)
+            addView(button("Preview the card for 5 minutes") {
+                val ok = Engine.postTest(context)
+                toast(if (ok) "Sent. Lock the phone to see it." else "No upcoming times found")
+            }, spaced())
         })
 
-        column.addView(heading("Location"))
-        column.addView(caption("Set by hand, because the phone is offline on Shabbos. Change it before Shabbos when you travel."))
-        val presets = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        presets.addView(button("Crown Heights") {
-            fill(Place("Crown Heights", 40.667471, -73.9435662, "America/New_York", false))
+        // Only lists what still needs doing.
+        setupBox = card { }
+        page.addView(setupBox)
+
+        page.addView(card {
+            addView(label("LOCATION"))
+            placeLabel = text("").also(::addView)
+            searchField = EditText(context).apply {
+                hint = "Search a town, suburb or postcode"
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+                isSingleLine = true
+                imeOptions = EditorInfo.IME_ACTION_SEARCH
+                setOnEditorActionListener { _, action, _ ->
+                    if (action == EditorInfo.IME_ACTION_SEARCH) search()
+                    action == EditorInfo.IME_ACTION_SEARCH
+                }
+            }
+            addView(searchField, spaced())
+            searchButton = button("Search") { search() }.also(::addView)
+            resultsBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+            addView(resultsBox)
+            addView(hint("Search needs a connection, so set the location before Shabbos when you travel."))
+
+            addView(link("Enter coordinates by hand") {
+                manualBox.visibility = if (manualBox.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            })
+            manualBox = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = View.GONE
+            }
+            val decimal = InputType.TYPE_CLASS_NUMBER or
+                InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
+            nameField = field("Name", InputType.TYPE_CLASS_TEXT).also(manualBox::addView)
+            latField = field("Latitude", decimal).also(manualBox::addView)
+            lngField = field("Longitude", decimal).also(manualBox::addView)
+            tzField = field("Time zone, e.g. America/New_York", InputType.TYPE_CLASS_TEXT).also(manualBox::addView)
+            israelBox = CheckBox(context).apply { text = "In Israel (one day of Yom Tov)" }
+            manualBox.addView(israelBox)
+            manualBox.addView(button("Save location") { saveManual() })
+            addView(manualBox)
         })
-        presets.addView(button("Bondi") {
-            fill(Place("Bondi", -33.8930556, 151.2633333, "Australia/Sydney", false))
+
+        page.addView(card {
+            addView(label("TIMING"))
+            addView(numberRow("Show the card this many minutes before candle lighting", prefs.leadMinutes, 0, 1440) {
+                prefs.leadMinutes = it
+            })
+            addView(numberRow("Candle lighting, minutes before sunset", prefs.candleMinutes, 0, 120) {
+                prefs.candleMinutes = it
+            })
         })
-        column.addView(presets)
-        nameField = field("Name", InputType.TYPE_CLASS_TEXT).also(column::addView)
-        latField = field("Latitude", signedDecimal).also(column::addView)
-        lngField = field("Longitude", signedDecimal).also(column::addView)
-        tzField = field("Time zone, e.g. America/New_York", InputType.TYPE_CLASS_TEXT).also(column::addView)
-        israelBox = CheckBox(this).apply { text = "In Israel (one day of Yom Tov)" }.also(column::addView)
 
-        column.addView(heading("Timing"))
-        column.addView(caption("Candle lighting, minutes before sunset"))
-        candleField = field("18", InputType.TYPE_CLASS_NUMBER).also(column::addView)
-        column.addView(caption("Show the card this many minutes before candle lighting"))
-        leadField = field("120", InputType.TYPE_CLASS_NUMBER).also(column::addView)
+        page.addView(card {
+            addView(label("SHABBOS MODE"))
+            addView(Switch(context).apply {
+                text = "Signal Samsung Routines"
+                textSize = 16f
+                isChecked = prefs.routinesEnabled
+                setOnCheckedChangeListener { _, on ->
+                    prefs.routinesEnabled = on
+                    routineBox.visibility = if (on) View.VISIBLE else View.GONE
+                    resync()
+                }
+            })
+            addView(hint("Lets a Samsung routine switch on flight mode at the right time, on Yom Tov as well."))
+            routineBox = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = if (prefs.routinesEnabled) View.VISIBLE else View.GONE
+            }
+            routineBox.addView(numberRow("Start, minutes before candle lighting", prefs.modeOnMinutes, 0, 720) {
+                prefs.modeOnMinutes = it
+            })
+            routineBox.addView(numberRow("End, minutes after Shabbos ends", prefs.modeOffMinutes, 0, 720) {
+                prefs.modeOffMinutes = it
+            })
+            routineBox.addView(text(
+                "In Modes and Routines, make two routines. For each, choose If > Notification received, " +
+                    "pick Shabbos Ends, then Notification with specific keyword.\n\n" +
+                    "Routine 1, keyword \"${Engine.START_TITLE}\": flight mode on, and anything else you want.\n\n" +
+                    "Routine 2, keyword \"${Engine.END_TITLE}\": flight mode off, and the rest put back."
+            ), spaced())
+            routineBox.addView(button("Send the start signal now") {
+                Engine.postTrigger(context, start = true)
+                toast("Sent: ${Engine.START_TITLE}")
+            }, spaced())
+            routineBox.addView(button("Send the end signal now") {
+                Engine.postTrigger(context, start = false)
+                toast("Sent: ${Engine.END_TITLE}")
+            })
+            addView(routineBox)
+        })
 
-        column.addView(button("Save") { save() })
+        page.addView(card {
+            addView(label("COMING UP"))
+            upcomingView = text("").also(::addView)
+        })
 
-        fill(prefs.place)
-        candleField.setText(prefs.candleMinutes.toString())
-        leadField.setText(prefs.leadMinutes.toString())
+        fillManual(prefs.place)
     }
 
     override fun onResume() {
         super.onResume()
-        Engine.sync(this)
-        refresh()
+        resync()
     }
 
     override fun onRequestPermissionsResult(code: Int, permissions: Array<String>, results: IntArray) {
         super.onRequestPermissionsResult(code, permissions, results)
-        Engine.sync(this)
+        resync()
+    }
+
+    private fun resync() {
+        try {
+            Engine.sync(this)
+        } catch (e: Exception) {
+            toast("Couldn't schedule: ${e.message}")
+        }
         refresh()
     }
 
-    private fun fill(place: Place) {
+    // ---- Location ----
+
+    private fun search() {
+        val query = searchField.text.toString().trim()
+        if (query.length < 2) return toast("Type at least two letters")
+        hideKeyboard()
+        searchButton.isEnabled = false
+        searchButton.text = "Searching…"
+        resultsBox.removeAllViews()
+        Thread {
+            val hits = try {
+                Geocoder.search(query)
+            } catch (e: Exception) {
+                null
+            }
+            runOnUiThread {
+                searchButton.isEnabled = true
+                searchButton.text = "Search"
+                when {
+                    hits == null -> resultsBox.addView(hint("Couldn't search. Check the connection and try again."))
+                    hits.isEmpty() -> resultsBox.addView(hint("Nothing found. Try a nearby town or a postcode."))
+                    else -> hits.forEach { hit ->
+                        resultsBox.addView(link(hit.label) { choose(hit.place) })
+                    }
+                }
+            }
+        }.start()
+    }
+
+    private fun choose(place: Place) {
+        prefs.place = place
+        resultsBox.removeAllViews()
+        searchField.setText("")
+        fillManual(place)
+        resync()
+        toast("Location set to ${place.name}")
+    }
+
+    private fun fillManual(place: Place) {
         nameField.setText(place.name)
         latField.setText(place.lat.toString())
         lngField.setText(place.lng.toString())
@@ -123,58 +245,194 @@ class MainActivity : Activity() {
         israelBox.isChecked = place.inIsrael
     }
 
-    private fun save() {
+    private fun saveManual() {
         val lat = latField.text.toString().toDoubleOrNull()
         val lng = lngField.text.toString().toDoubleOrNull()
         val tz = tzField.text.toString().trim()
         if (lat == null || lat < -90 || lat > 90) return toast("Latitude must be between -90 and 90")
         if (lng == null || lng < -180 || lng > 180) return toast("Longitude must be between -180 and 180")
         if (!Prefs.isKnownTimeZone(tz)) return toast("Unknown time zone: $tz")
-
-        prefs.place = Place(
-            name = nameField.text.toString().trim().ifEmpty { "Home" },
-            lat = lat,
-            lng = lng,
-            tzId = tz,
-            inIsrael = israelBox.isChecked,
+        hideKeyboard()
+        choose(
+            Place(
+                name = nameField.text.toString().trim().ifEmpty { "Home" },
+                lat = lat,
+                lng = lng,
+                tzId = tz,
+                inIsrael = israelBox.isChecked,
+            )
         )
-        prefs.candleMinutes = candleField.text.toString().toIntOrNull()?.coerceIn(0, 120) ?: 18
-        prefs.leadMinutes = leadField.text.toString().toIntOrNull()?.coerceIn(0, 1440) ?: 120
-        Engine.sync(this)
-        refresh()
-        toast("Saved")
     }
+
+    // ---- Display ----
 
     private fun refresh() {
         val place = prefs.place
         val tz = place.timeZone
         val spans = ShabbosCalc.upcoming(place, Date(), 8, prefs.candleMinutes)
+        val next = spans.firstOrNull()
 
-        upcomingView.text = if (spans.isEmpty()) "No times found for this location." else
-            spans.joinToString("\n\n") { s ->
-                "${s.label} ${Engine.date(s.ends, tz)}, ${Engine.time(this, s.ends, tz, true)}\n" +
-                    "Candle lighting ${Engine.date(s.candleLighting, tz)}, " +
-                    Engine.time(this, s.candleLighting, tz, true)
-            }
+        placeLabel.text = place.name + if (place.inIsrael) " (Israel)" else ""
 
+        if (next == null) {
+            heroTitle.text = "No times found"
+            heroDetail.text = "Check the location below."
+        } else {
+            heroTitle.text = "${next.label} ${Engine.time(this, next.ends, tz, true)}"
+            heroDetail.text = "${Engine.date(next.ends, tz)}\n" +
+                "Candle lighting ${Engine.date(next.candleLighting, tz)}, " +
+                "${Engine.time(this, next.candleLighting, tz, true)}\n${place.name}"
+        }
+
+        upcomingView.text = spans.drop(1).joinToString("\n\n") { s ->
+            "${s.label} ${Engine.date(s.ends, tz)}, ${Engine.time(this, s.ends, tz, true)}\n" +
+                "Candle lighting ${Engine.date(s.candleLighting, tz)}, " +
+                Engine.time(this, s.candleLighting, tz, true)
+        }
+
+        refreshSetup(next)
+    }
+
+    private fun refreshSetup(next: Span?) {
         val nm = getSystemService(NotificationManager::class.java)
         val notificationsOn = checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED && nm.areNotificationsEnabled()
         val liveUpdatesOn = nm.canPostPromotedNotifications()
         val batteryFree = getSystemService(PowerManager::class.java)
             .isIgnoringBatteryOptimizations(packageName)
-        val promotable = spans.firstOrNull()
-            ?.let { Engine.buildCard(this, place, it, 60_000).hasPromotableCharacteristics() }
+        val promotable = next == null ||
+            Engine.buildCard(this, prefs.place, next, 60_000).hasPromotableCharacteristics()
 
-        statusView.text = listOf(
-            mark(notificationsOn) + "Notifications allowed",
-            mark(liveUpdatesOn) + "Live Updates allowed for this app",
-            mark(promotable == true) + "Card qualifies as a Live Update",
-            mark(batteryFree) + "Battery restrictions off",
-        ).joinToString("\n")
+        setupBox.removeAllViews()
+        setupBox.addView(label("SETUP"))
+        if (!notificationsOn) {
+            setupBox.addView(todo("Notifications are off, so the card can't appear.", "Allow") {
+                if (prefs.askedForNotifications) {
+                    open(
+                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    )
+                } else {
+                    prefs.askedForNotifications = true
+                    requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+                }
+            })
+        }
+        if (!liveUpdatesOn) {
+            setupBox.addView(todo("Live Updates are off, so the card stays out of the Now Bar.", "Turn on") {
+                open(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                )
+            })
+        }
+        if (!batteryFree) {
+            setupBox.addView(todo("Battery saving may stop the Friday alarm.", "Fix") {
+                open(
+                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                        .setData(Uri.parse("package:$packageName"))
+                )
+            })
+        }
+        if (!promotable) {
+            setupBox.addView(text("This phone doesn't accept the card as a Live Update."))
+        }
+        if (notificationsOn && liveUpdatesOn && batteryFree && promotable) {
+            setupBox.addView(text("✓  Ready. The card appears on its own each week."))
+        }
     }
 
-    private fun mark(ok: Boolean) = if (ok) "✓  " else "✗  "
+    // ---- Small building blocks ----
+
+    private fun card(build: LinearLayout.() -> Unit) = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(18), dp(16), dp(18), dp(16))
+        background = GradientDrawable().apply {
+            cornerRadius = dp(22).toFloat()
+            // A faint tint of the text colour reads as a card in light and dark themes.
+            setColor((textColor and 0x00FFFFFF) or 0x14000000)
+        }
+        layoutParams = spaced(12)
+        build()
+    }
+
+    private fun spaced(top: Int = 8) = LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+    ).apply { topMargin = dp(top) }
+
+    private fun label(value: String) = TextView(this).apply {
+        text = value
+        textSize = 12f
+        letterSpacing = 0.12f
+        typeface = Typeface.DEFAULT_BOLD
+        setTextColor(accentColor)
+        setPadding(0, 0, 0, dp(6))
+    }
+
+    private fun text(value: String) = TextView(this).apply {
+        text = value
+        textSize = 15f
+        setLineSpacing(0f, 1.25f)
+    }
+
+    private fun hint(value: String) = TextView(this).apply {
+        text = value
+        textSize = 13f
+        alpha = 0.65f
+        setPadding(0, dp(6), 0, dp(6))
+    }
+
+    private fun link(value: String, onClick: (View) -> Unit) = TextView(this).apply {
+        text = value
+        textSize = 16f
+        setTextColor(accentColor)
+        setPadding(0, dp(12), 0, dp(12))
+        setOnClickListener(onClick)
+    }
+
+    private fun field(hintText: String, type: Int) = EditText(this).apply {
+        hint = hintText
+        inputType = type
+        isSingleLine = true
+    }
+
+    private fun button(value: String, onClick: (View) -> Unit) = Button(this).apply {
+        text = value
+        isAllCaps = false
+        setOnClickListener(onClick)
+    }
+
+    /** One thing left to set up, with the button that fixes it. */
+    private fun todo(message: String, action: String, onClick: (View) -> Unit) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        addView(text(message), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(button(action, onClick))
+    }
+
+    /** A labelled number that saves itself as soon as it is valid. */
+    private fun numberRow(title: String, value: Int, min: Int, max: Int, save: (Int) -> Unit) =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(text(title), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(EditText(context).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER
+                isSingleLine = true
+                gravity = Gravity.CENTER
+                setText(value.toString())
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                    override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                    override fun afterTextChanged(s: Editable?) {
+                        val number = s?.toString()?.toIntOrNull() ?: return
+                        if (number < min || number > max) return
+                        save(number)
+                        resync()
+                    }
+                })
+            }, LinearLayout.LayoutParams(dp(76), LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
 
     private fun open(intent: Intent) {
         try {
@@ -188,37 +446,19 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun heading(text: String) = TextView(this).apply {
-        this.text = text
-        textSize = 20f
-        setPadding(0, dp(24), 0, dp(8))
+    private fun hideKeyboard() {
+        getSystemService(InputMethodManager::class.java)
+            .hideSoftInputFromWindow(searchField.windowToken, 0)
     }
 
-    private fun caption(text: String) = TextView(this).apply {
-        this.text = text
-        textSize = 13f
-        alpha = 0.7f
-        setPadding(0, dp(8), 0, 0)
+    private fun themeColor(attr: Int): Int {
+        val values = obtainStyledAttributes(intArrayOf(attr))
+        val color = values.getColor(0, 0xFF888888.toInt())
+        values.recycle()
+        return color
     }
 
-    private fun body() = TextView(this).apply {
-        textSize = 15f
-        setLineSpacing(0f, 1.2f)
-    }
-
-    private fun field(hint: String, type: Int) = EditText(this).apply {
-        this.hint = hint
-        inputType = type
-        isSingleLine = true
-    }
-
-    private fun button(text: String, onClick: (View) -> Unit) = Button(this).apply {
-        this.text = text
-        isAllCaps = false
-        setOnClickListener(onClick)
-    }
-
-    private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_LONG).show()
+    private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

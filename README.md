@@ -28,14 +28,14 @@ the same key, so a new APK installs over the old one.
 ## Set up on the phone
 
 1. Install the APK and open the app.
-2. Tap **Allow notifications**.
-3. Tap **Live Update setting** and make sure it is on.
-4. Tap **Turn off battery restrictions**.
-5. Pick a location and tap **Save**.
-6. Tap **Show a test card for 5 minutes**, lock the phone, and look at the
+2. The **Setup** box lists anything still to do, each with a button. Work
+   through it until it says "Ready".
+3. Under **Location**, search for your town, suburb or postcode and tap the
+   result. Search needs a connection; everything else works offline.
+4. Tap **Preview the card for 5 minutes**, lock the phone, and look at the
    Now Bar and the Always On Display.
 
-If the test card only appears as an ordinary notification, turn on
+If the preview only appears as an ordinary notification, turn on
 Settings > Developer options > **Live notifications for all apps** and try again.
 
 ## What it does
@@ -43,9 +43,28 @@ Settings > Developer options > **Live notifications for all apps** and try again
 - The card appears 2 hours before candle lighting (adjustable) and removes
   itself when Shabbos or Yom Tov ends.
 - A two-day Yom Tov, or Yom Tov running into Shabbos, is one card showing the
-  final end time with its day, e.g. "Shabbos ends Sat 8:28 PM".
+  final end time with its day, e.g. "Shabbos ends Sat 8:28".
 - It reschedules itself after a reboot, a clock or time zone change, and an
   app update.
+
+## Switching the phone into Shabbos mode
+
+The app can't turn on flight mode itself, but Samsung Routines can, and the app
+can tell it when. Turn on **Signal Samsung Routines** in the app, then make two
+routines in Modes and Routines:
+
+| Routine | If | Then |
+|---|---|---|
+| Start | Notification received > Shabbos Ends > keyword `Shabbos mode starting` | Flight mode on, and anything else |
+| End | Notification received > Shabbos Ends > keyword `Shabbos mode ending` | Flight mode off, and the rest put back |
+
+The app sends the first signal a set time before candle lighting and the second
+a set time after Shabbos or Yom Tov ends. Each is a silent notification that
+disappears after two minutes. The two buttons in the app send them on demand,
+for testing the routines.
+
+The end signal is only sent for a Shabbos or Yom Tov the app sent a start
+signal for.
 
 ## The times
 
@@ -55,3 +74,9 @@ Settings > Developer options > **Live notifications for all apps** and try again
 
 Calculation is by the KosherJava zmanim library. The logic is in
 `ShabbosCalc.kt` and has no Android code in it.
+
+## Place search
+
+Search uses Open-Meteo's free geocoding service, built on the open GeoNames
+database. It finds towns, neighbourhoods and postcodes, not street addresses,
+and supplies the time zone. Coordinates can also be entered by hand.

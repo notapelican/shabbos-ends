@@ -11,8 +11,8 @@ android {
         applicationId = "app.shabbosends"
         minSdk = 36          // Live Updates need Android 16
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     // A fixed key committed to the repo, so every build from GitHub Actions

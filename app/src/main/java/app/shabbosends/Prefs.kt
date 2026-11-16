@@ -35,6 +35,35 @@ class Prefs(context: Context) {
         get() = sp.getInt("lead", 120)
         set(v) { sp.edit().putInt("lead", v).apply() }
 
+    /** Whether to post the two notifications that Samsung Routines listens for. */
+    var routinesEnabled: Boolean
+        get() = sp.getBoolean("routines", false)
+        set(v) { sp.edit().putBoolean("routines", v).apply() }
+
+    /** Minutes before candle lighting for the "starting" trigger. */
+    var modeOnMinutes: Int
+        get() = sp.getInt("modeOn", 10)
+        set(v) { sp.edit().putInt("modeOn", v).apply() }
+
+    /** Minutes after Shabbos ends for the "ending" trigger. */
+    var modeOffMinutes: Int
+        get() = sp.getInt("modeOff", 10)
+        set(v) { sp.edit().putInt("modeOff", v).apply() }
+
+    /** End time of the last Shabbos or Yom Tov the "starting" trigger fired for. */
+    var lastOn: Long
+        get() = sp.getLong("lastOn", 0)
+        set(v) { sp.edit().putLong("lastOn", v).apply() }
+
+    /** End time of the last Shabbos or Yom Tov the "ending" trigger fired for. */
+    var lastOff: Long
+        get() = sp.getLong("lastOff", 0)
+        set(v) { sp.edit().putLong("lastOff", v).apply() }
+
+    var askedForNotifications: Boolean
+        get() = sp.getBoolean("askedNotif", false)
+        set(v) { sp.edit().putBoolean("askedNotif", v).apply() }
+
     companion object {
         fun isKnownTimeZone(id: String): Boolean = TimeZone.getAvailableIDs().contains(id)
     }
