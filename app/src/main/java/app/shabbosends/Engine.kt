@@ -10,6 +10,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateFormat
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -26,7 +27,9 @@ object Engine {
     const val END_TITLE = "Shabbos mode ending"
     const val FOLLOW_TITLE = "Shabbos mode follow-up"
 
-    private const val CARD_CHANNEL = "shabbos_ends"
+    // A new id, because Android won't let an app change an existing channel's importance.
+    private const val CARD_CHANNEL = "shabbos_card"
+    private const val OLD_CARD_CHANNEL = "shabbos_ends"
     private const val TRIGGER_CHANNEL = "routine_triggers"
     private const val CARD_ID = 1
     private const val TEST_ID = 2
@@ -56,12 +59,22 @@ object Engine {
         if (current == null) {
             nm.cancel(CARD_ID)
         } else {
+            val place = prefs.place
+            val life = current.ends.time - now
             val showAt = current.candleLighting.time - prefs.leadMinutes * MINUTE
-            if (now >= showAt) {
-                nm.notify(CARD_ID, buildCard(context, prefs.place, current, current.ends.time - now))
+            // Optional: from midday on the eve, the same card shows candle lighting first.
+            val candleAt = if (prefs.candleCardEnabled) {
+                middayOf(current.candleLighting, place.timeZone)
             } else {
-                nm.cancel(CARD_ID)
+                Long.MAX_VALUE
             }
+            when {
+                now >= showAt -> nm.notify(CARD_ID, buildCard(context, place, current, life))
+                // Same id as the end card, so the changeover updates it in place.
+                now >= candleAt -> nm.notify(CARD_ID, buildCard(context, place, current, life, candle = true))
+                else -> nm.cancel(CARD_ID)
+            }
+            if (candleAt != Long.MAX_VALUE) wakeAt(candleAt)
             wakeAt(showAt)
             wakeAt(current.ends.time + 1000)
         }
@@ -100,13 +113,13 @@ object Engine {
     }
 
     /** Posts the next card for five minutes, to see how the phone displays it. */
-    fun postTest(context: Context): Boolean {
+    fun postTest(context: Context, candle: Boolean = false): Boolean {
         val prefs = Prefs(context)
         val nm = context.getSystemService(NotificationManager::class.java)
         ensureChannels(nm)
         val span = ShabbosCalc.upcoming(prefs.place, Date(), 1, prefs.candleMinutes).firstOrNull()
             ?: return false
-        nm.notify(TEST_ID, buildCard(context, prefs.place, span, 5 * MINUTE))
+        nm.notify(TEST_ID, buildCard(context, prefs.place, span, 5 * MINUTE, candle))
         return true
     }
 
@@ -129,12 +142,24 @@ object Engine {
         nm.notify(id, notification)
     }
 
-    fun buildCard(context: Context, place: Place, span: Span, lifetimeMillis: Long): Notification {
+    fun buildCard(
+        context: Context,
+        place: Place,
+        span: Span,
+        lifetimeMillis: Long,
+        candle: Boolean = false,
+    ): Notification {
         val tz = place.timeZone
         // Name the day whenever it is not simply "tomorrow night".
         val endDay = if (span.days > 1 || !span.endsOnShabbos) day(span.ends, tz) + " " else ""
-        // One short line and nothing else, so the Now Bar shows all of it: "Shabbos ends 5:22".
-        val title = "${span.label} $endDay${time(context, span.ends, tz, false)}"
+        // One short line and nothing else, so the Now Bar shows all of it:
+        // "Candle lighting 4:16" or "Shabbos ends 5:22".
+        val shown = if (candle) span.candleLighting else span.ends
+        val title = if (candle) {
+            "Candle lighting ${time(context, shown, tz, false)}"
+        } else {
+            "${span.label} $endDay${time(context, shown, tz, false)}"
+        }
 
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java),
@@ -153,18 +178,25 @@ object Engine {
             .setTimeoutAfter(lifetimeMillis.coerceAtLeast(MINUTE))
             // These two make it an Android 16 Live Update. The promotion request
             // only became a named method in API 36.1, so it is set by its key.
-            .setShortCriticalText(time(context, span.ends, tz, false))
+            .setShortCriticalText(time(context, shown, tz, false))
             .addExtras(Bundle().apply { putBoolean("android.requestPromotedOngoing", true) })
             .build()
     }
 
     private fun ensureChannels(nm: NotificationManager) {
         if (nm.getNotificationChannel(CARD_CHANNEL) == null) {
-            val card = NotificationChannel(CARD_CHANNEL, "Shabbos ends", NotificationManager.IMPORTANCE_LOW)
-            card.description = "The card showing when Shabbos or Yom Tov ends"
+            // Normal importance, so Android ranks the card with ordinary notifications
+            // and not in the "silent" group below them. Sound and vibration are
+            // switched off on the channel itself, so it never buzzes or rings.
+            val card = NotificationChannel(CARD_CHANNEL, "Shabbos card", NotificationManager.IMPORTANCE_DEFAULT)
+            card.description = "The card showing candle lighting and when Shabbos or Yom Tov ends"
             card.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            card.setSound(null, null)
+            card.enableVibration(false)
+            card.enableLights(false)
             card.setShowBadge(false)
             nm.createNotificationChannel(card)
+            nm.deleteNotificationChannel(OLD_CARD_CHANNEL)
         }
         if (nm.getNotificationChannel(TRIGGER_CHANNEL) == null) {
             val trigger = NotificationChannel(
@@ -175,6 +207,16 @@ object Engine {
             nm.createNotificationChannel(trigger)
         }
     }
+
+    /** 12:00 pm, in the place's own time zone, on the day candles are lit. */
+    private fun middayOf(date: Date, tz: TimeZone): Long =
+        Calendar.getInstance(tz).apply {
+            time = date
+            set(Calendar.HOUR_OF_DAY, 12)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
 
     private fun schedule(context: Context, atMillis: Long) {
         val am = context.getSystemService(AlarmManager::class.java)

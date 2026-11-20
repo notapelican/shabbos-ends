@@ -35,6 +35,11 @@ class Prefs(context: Context) {
         get() = sp.getInt("lead", 120)
         set(v) { sp.edit().putInt("lead", v).apply() }
 
+    /** Whether the card shows candle lighting from midday on the eve. */
+    var candleCardEnabled: Boolean
+        get() = sp.getBoolean("candleCard", false)
+        set(v) { sp.edit().putBoolean("candleCard", v).apply() }
+
     /** Whether to post the two notifications that Samsung Routines listens for. */
     var routinesEnabled: Boolean
         get() = sp.getBoolean("routines", false)

@@ -131,6 +131,23 @@ class MainActivity : Activity() {
             addView(numberRow("Candle lighting, minutes before sunset", prefs.candleMinutes, 0, 120) {
                 prefs.candleMinutes = it
             })
+            addView(Switch(context).apply {
+                text = "Show candle lighting first"
+                textSize = 16f
+                isChecked = prefs.candleCardEnabled
+                setOnCheckedChangeListener { _, on ->
+                    prefs.candleCardEnabled = on
+                    resync()
+                }
+            }, spaced(16))
+            addView(hint(
+                "From 12:00 pm on Friday, or on the eve of Yom Tov, the card shows the candle lighting " +
+                    "time. It changes to the end time at the point set above."
+            ))
+            addView(button("Preview the candle lighting card") {
+                val ok = Engine.postTest(context, candle = true)
+                toast(if (ok) "Sent. Lock the phone to see it." else "No upcoming times found")
+            })
         })
 
         page.addView(card {

@@ -44,6 +44,10 @@ Settings > Developer options > **Live notifications for all apps** and try again
   itself when Shabbos or Yom Tov ends.
 - A two-day Yom Tov, or Yom Tov running into Shabbos, is one card showing the
   final end time with its day, e.g. "Shabbos ends Sat 8:28".
+- Optionally ("Show candle lighting first"), the card appears at 12:00 pm on
+  Friday or the eve of Yom Tov showing "Candle lighting 4:16", then changes to
+  the end time at the usual point.
+- No notification from the app makes a sound or vibrates.
 - It reschedules itself after a reboot, a clock or time zone change, and an
   app update.
 
