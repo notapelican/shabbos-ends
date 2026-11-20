@@ -323,10 +323,12 @@ class MainActivity : Activity() {
             addView(timingBox)
         })
 
-        // The weeks ahead, last on the page.
+        // The weeks ahead, last on the page and closed until tapped: it is mainly for checking.
         page.addView(card {
-            addView(label("COMING UP"))
-            upcomingView = text("").also(::addView)
+            val weeks = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+            weeks.addView(hint("The next several weeks, for checking the times against your own calendar."))
+            upcomingView = text("").also(weeks::addView)
+            addView(submenu("Coming up", false, weeks))
         })
 
         showAutomationParts()
