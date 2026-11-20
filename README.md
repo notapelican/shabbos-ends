@@ -8,18 +8,18 @@ other Android 16 phones should work but are untested.
 
 ## What it does
 
-- **Shows when Shabbos ends.** A small card reading, for example,
+- 🌙 **Shows when Shabbos ends.** A small card reading, for example,
   "Shabbos ends 5:17" appears at candle lighting and removes itself when
   Shabbos is over. On a Samsung it sits in the Now Bar.
-- **Shows candle lighting first, if you like.** On Friday the card can start
+- 🕯️ **Shows candle lighting first, if you like.** On Friday the card can start
   earlier, reading "Candle lighting 4:16", then change to the end time.
-- **Covers Yom Tov.** A two-day Yom Tov, or Yom Tov running into Shabbos, is
+- 📅 **Covers Yom Tov.** A two-day Yom Tov, or Yom Tov running into Shabbos, is
   one card showing the final end time and its day, such as
   "Shabbos ends Sat 8:28".
-- **Stays quiet.** Nothing the app shows makes a sound or vibrates.
-- **Looks after itself.** Once set up it runs every week, and carries on after
+- 🔕 **Stays quiet.** Nothing the app shows makes a sound or vibrates.
+- 🔁 **Looks after itself.** Once set up it runs every week, and carries on after
   the phone restarts.
-- **Can switch your phone into Shabbos mode.** Optionally, it turns on
+- ✈️ **Can switch your phone into Shabbos mode.** Optionally, it turns on
   Do Not Disturb, locks the screen orientation, or tells Samsung Routines when
   to switch on flight mode.
 
@@ -40,13 +40,13 @@ That's all. The card now appears by itself each week.
 
 ### If the preview doesn't show properly
 
-- **It only appears as an ordinary notification (Samsung):** turn on
+- 🔔 **It only appears as an ordinary notification (Samsung):** turn on
   Settings > Developer options > **Live notifications for all apps**. If you
   can't see Developer options, go to Settings > About phone > Software
   information and tap **Build number** seven times.
-- **It's missing from the Always On Display:** set the Always On Display to
+- 📱 **It's missing from the Always On Display:** set the Always On Display to
   show **Always**, not "Tap to show".
-- **Something else is in the Now Bar (Samsung):** in Settings > Lock screen and
+- 🧹 **Something else is in the Now Bar (Samsung):** in Settings > Lock screen and
   AOD > Now bar, switch off the items you don't want competing with it.
 
 ## Travelling
@@ -88,11 +88,11 @@ The options are in two submenus. The one for your phone starts open.
 
 Done by the app itself. These work on a Samsung too.
 
-- **Do Not Disturb during Shabbos.** The app asks for Do Not Disturb access
+- 🤫 **Do Not Disturb during Shabbos.** The app asks for Do Not Disturb access
   when you switch this on. Afterwards it only turns Do Not Disturb off if it
   was the one that turned it on. To change who can still get through, look for
   the app's name under Settings > Modes.
-- **Lock the screen orientation during Shabbos.** Choose portrait, landscape
+- 🔒 **Lock the screen orientation during Shabbos.** Choose portrait, landscape
   or flipped landscape. The app asks for permission to change system settings.
   Your phone's own setting is put back afterwards.
 
@@ -124,13 +124,13 @@ check your setup without waiting for Friday.
 
 ## Good to know
 
-- Don't force-stop the app in Settings. That cancels its weekly alarm until
+- ⛔ Don't force-stop the app in Settings. That cancels its weekly alarm until
   you next open it.
-- Leave notifications allowed and battery restrictions off for the app. The
+- 🔋 Leave notifications allowed and battery restrictions off for the app. The
   Setup box tells you if either changes.
-- The card shows the final end time only. It doesn't show candle lighting for
+- ⏱️ The card shows the final end time only. It doesn't show candle lighting for
   the second night of Yom Tov.
-- Fast days other than Yom Kippur aren't covered.
+- 🚫 Fast days other than Yom Kippur aren't covered.
 
 ---
 
@@ -138,9 +138,9 @@ check your setup without waiting for Friday.
 
 ### How the times are calculated
 
-- Candle lighting: sea-level sunset minus 18 minutes (adjustable).
-- Shabbos or Yom Tov ends: sun 8.5 degrees below the horizon.
-- Both are rounded to the nearest minute.
+- 🕯️ Candle lighting: sea-level sunset minus 18 minutes (adjustable).
+- 🌙 Shabbos or Yom Tov ends: sun 8.5 degrees below the horizon.
+- ⏱️ Both are rounded to the nearest minute.
 
 These were checked against chabad.org for Crown Heights and Bondi and matched
 to the minute. Calculation is by the KosherJava zmanim library and runs
