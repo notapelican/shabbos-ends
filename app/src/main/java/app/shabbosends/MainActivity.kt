@@ -190,12 +190,7 @@ class MainActivity : Activity() {
             addView(candleBox)
         })
 
-        page.addView(card {
-            addView(label("COMING UP"))
-            upcomingView = text("").also(::addView)
-        })
-
-        // Optional, and last on the page: most people never need it.
+        // Optional: most people never need it.
         page.addView(card {
             addView(label("OPTIONAL: SHABBOS AUTOMATION"))
             addView(text(
@@ -326,6 +321,12 @@ class MainActivity : Activity() {
                 toast("Ended, and settings put back.")
             })
             addView(timingBox)
+        })
+
+        // The weeks ahead, last on the page.
+        page.addView(card {
+            addView(label("COMING UP"))
+            upcomingView = text("").also(::addView)
         })
 
         showAutomationParts()

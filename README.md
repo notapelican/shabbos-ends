@@ -69,8 +69,8 @@ All under **Timing** in the app. Changes save as you type.
 | Show candle lighting first | Shows "Candle lighting 4:16" on Friday before the end time takes over. | Off |
 | Candle lighting card appears at | The time on Friday that card first shows. Only there when the option above is on. | 12:00 pm |
 
-The **Coming up** box lists the next several weeks, so you can compare the
-times with your own calendar.
+The **Coming up** box at the bottom of the app lists the next several weeks,
+so you can compare the times with your own calendar.
 
 ## Optional: Shabbos automation
 
