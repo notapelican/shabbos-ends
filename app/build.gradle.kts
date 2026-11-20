@@ -8,11 +8,13 @@ android {
     compileSdk = 36
 
     defaultConfig {
+        // Kept from when the app was called Shabbos Ends, so updates install over
+        // the old app and keep its settings, permissions and Samsung routines.
         applicationId = "app.shabbosends"
         minSdk = 36          // Live Updates need Android 16
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.9"
+        versionCode = 11
+        versionName = "2.0"
     }
 
     // A fixed key committed to the repo, so every build from GitHub Actions

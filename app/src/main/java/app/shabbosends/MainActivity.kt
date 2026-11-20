@@ -267,7 +267,7 @@ class MainActivity : Activity() {
             routineBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
             routineBox.addView(text(
                 "In Modes and Routines, make two routines. For each, choose If > Notification received, " +
-                    "pick Shabbos Ends, then Notification with specific keyword.\n\n" +
+                    "pick Shabbos Mode, then Notification with specific keyword.\n\n" +
                     "Routine 1, keyword \"${Engine.START_TITLE}\": flight mode on, and anything else you want.\n\n" +
                     "Routine 2, keyword \"${Engine.END_TITLE}\": flight mode off, and the rest put back."
             ), spaced())

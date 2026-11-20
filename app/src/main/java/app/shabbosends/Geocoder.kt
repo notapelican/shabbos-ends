@@ -26,7 +26,7 @@ object Geocoder {
         val inIsrael: Boolean,
     )
 
-    private const val AGENT = "ShabbosEnds/1.3 (github.com/notapelican/shabbos-ends)"
+    private const val AGENT = "ShabbosMode/2.0 (github.com/notapelican)"
 
     /** Blocking network call: run it off the main thread. */
     fun search(query: String): List<Hit> {

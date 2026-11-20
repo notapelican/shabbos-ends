@@ -1,7 +1,8 @@
-# Shabbos Ends
+# Shabbos Mode
 
 An Android app that puts the time Shabbos or Yom Tov ends on your lock screen
 and Always On Display, so you can see it all day without touching the phone.
+It can also switch the phone into Shabbos mode and back at the right times.
 
 It works with the phone in flight mode. Built and tested on a Samsung Galaxy;
 other Android 16 phones should work but are untested.
@@ -27,8 +28,8 @@ other Android 16 phones should work but are untested.
 
 You need a phone running Android 16 or later.
 
-1. Download `shabbos-ends.apk` from this repo's **Releases** page and open it
-   to install. Your phone will ask you to allow installing from the browser.
+1. Download the APK from this repo's **Releases** page and open it to
+   install. Your phone will ask you to allow installing from the browser.
 2. Open the app. The **Setup** box lists anything still to do, each with its
    own button. Work through it until it says "Ready".
 3. Under **Location**, search for your suburb, town, address or postcode and
@@ -103,7 +104,7 @@ tell it when.
 
 1. In the app, turn on **Signal Samsung Routines**.
 2. In Samsung's Modes and Routines, make a routine. For **If**, choose
-   Notification received, pick Shabbos Ends, then Notification with specific
+   Notification received, pick Shabbos Mode, then Notification with specific
    keyword, and type `Shabbos mode starting`. For **Then**, add flight mode on
    and anything else you want.
 3. Make a second routine the same way with the keyword `Shabbos mode ending`,
@@ -174,8 +175,10 @@ back to Open-Meteo's own place list, which is built on GeoNames.
 ### Building
 
 Every push to `main` runs the **Build APK** workflow in GitHub Actions, which
-builds the app and publishes `shabbos-ends.apk` as a release called
-"Latest build", replacing the previous one.
+builds the app and publishes the APK as a release called "Latest build",
+replacing the previous one. The APK file is still named `shabbos-ends.apk`,
+and the app's internal ID is still `app.shabbosends`, both from the app's
+earlier name. Keeping the ID is what lets an update install over the old app.
 
 Builds are signed with the key in `app/sideload.jks`, so a new APK installs
 over the old one and keeps its settings. Because that key is in the repo, keep
