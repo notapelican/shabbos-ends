@@ -65,6 +65,39 @@ class Prefs(context: Context) {
         get() = sp.getLong("lastOff", 0)
         set(v) { sp.edit().putLong("lastOff", v).apply() }
 
+    /** Whether the app turns on Do Not Disturb for Shabbos itself. */
+    var dndEnabled: Boolean
+        get() = sp.getBoolean("dnd", false)
+        set(v) { sp.edit().putBoolean("dnd", v).apply() }
+
+    /** True while Do Not Disturb is on because this app turned it on. */
+    var dndSetByApp: Boolean
+        get() = sp.getBoolean("dndSet", false)
+        set(v) { sp.edit().putBoolean("dndSet", v).apply() }
+
+    /** Whether the app locks the screen orientation for Shabbos itself. */
+    var rotationEnabled: Boolean
+        get() = sp.getBoolean("rotation", false)
+        set(v) { sp.edit().putBoolean("rotation", v).apply() }
+
+    /** Index into PhoneMode.ROTATION_LABELS. Landscape by default. */
+    var rotationChoice: Int
+        get() = sp.getInt("rotationChoice", 1)
+        set(v) { sp.edit().putInt("rotationChoice", v).apply() }
+
+    /** True while the phone's own orientation settings are saved for putting back. */
+    var rotationSaved: Boolean
+        get() = sp.getBoolean("rotationSaved", false)
+        set(v) { sp.edit().putBoolean("rotationSaved", v).apply() }
+
+    var savedAutoRotate: Int
+        get() = sp.getInt("savedAuto", 1)
+        set(v) { sp.edit().putInt("savedAuto", v).apply() }
+
+    var savedRotation: Int
+        get() = sp.getInt("savedRotation", 0)
+        set(v) { sp.edit().putInt("savedRotation", v).apply() }
+
     /** Whether to send a third, later signal after Shabbos ends. */
     var followEnabled: Boolean
         get() = sp.getBoolean("follow", false)

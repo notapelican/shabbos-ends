@@ -79,26 +79,26 @@ object Engine {
             wakeAt(current.ends.time + 1000)
         }
 
-        // The triggers for Samsung Routines, each sent once per Shabbos or Yom Tov.
-        if (prefs.routinesEnabled) {
+        // Shabbos automation, each step done once per Shabbos or Yom Tov.
+        if (prefs.routinesEnabled || prefs.dndEnabled || prefs.rotationEnabled) {
             for (span in spans) {
                 val id = span.ends.time
                 val startAt = span.candleLighting.time - prefs.modeOnMinutes * MINUTE
                 val endAt = span.ends.time + prefs.modeOffMinutes * MINUTE
                 if (now >= startAt && now < span.ends.time && prefs.lastOn != id) {
-                    postTrigger(context, START_TITLE)
+                    startMode(context, prefs)
                     prefs.lastOn = id
                 }
                 // Only undo a mode this app switched on.
                 if (now >= endAt && prefs.lastOn == id && prefs.lastOff != id) {
-                    postTrigger(context, END_TITLE)
+                    endMode(context, prefs)
                     prefs.lastOff = id
                 }
                 wakeAt(startAt)
                 wakeAt(endAt)
 
                 // Optional later signal, for things to do once Shabbos is well over.
-                if (prefs.followEnabled) {
+                if (prefs.routinesEnabled && prefs.followEnabled) {
                     val followAt = span.ends.time + prefs.followMinutes * MINUTE
                     if (now >= followAt && prefs.lastOn == id && prefs.lastFollow != id) {
                         postTrigger(context, FOLLOW_TITLE)
@@ -110,6 +110,18 @@ object Engine {
         }
 
         if (next != Long.MAX_VALUE) schedule(context, next)
+    }
+
+    /** Puts the phone into Shabbos mode: the built-in actions, and the Samsung signal if used. */
+    fun startMode(context: Context, prefs: Prefs) {
+        if (prefs.routinesEnabled) postTrigger(context, START_TITLE)
+        PhoneMode.start(context, prefs)
+    }
+
+    /** Takes the phone back out of Shabbos mode. */
+    fun endMode(context: Context, prefs: Prefs) {
+        if (prefs.routinesEnabled) postTrigger(context, END_TITLE)
+        PhoneMode.end(context, prefs)
     }
 
     /** Posts the next card for five minutes, to see how the phone displays it. */
@@ -184,20 +196,22 @@ object Engine {
     }
 
     private fun ensureChannels(nm: NotificationManager) {
-        if (nm.getNotificationChannel(CARD_CHANNEL) == null) {
-            // Normal importance, so Android ranks the card with ordinary notifications
-            // and not in the "silent" group below them. Sound and vibration are
-            // switched off on the channel itself, so it never buzzes or rings.
-            val card = NotificationChannel(CARD_CHANNEL, "Shabbos card", NotificationManager.IMPORTANCE_DEFAULT)
-            card.description = "The card showing candle lighting and when Shabbos or Yom Tov ends"
-            card.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            card.setSound(null, null)
-            card.enableVibration(false)
-            card.enableLights(false)
-            card.setShowBadge(false)
-            nm.createNotificationChannel(card)
-            nm.deleteNotificationChannel(OLD_CARD_CHANNEL)
-        }
+        // Normal importance, so Android ranks the card with ordinary notifications
+        // and not in the "silent" group below them. Sound and vibration are
+        // switched off on the channel itself, so it never buzzes or rings.
+        val isNew = nm.getNotificationChannel(CARD_CHANNEL) == null
+        val card = NotificationChannel(CARD_CHANNEL, "Shabbos card", NotificationManager.IMPORTANCE_DEFAULT)
+        card.description = "The card showing candle lighting and when Shabbos or Yom Tov ends"
+        card.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        card.setSound(null, null)
+        card.enableVibration(false)
+        card.enableLights(false)
+        card.setShowBadge(false)
+        // Keeps the card visible while Do Not Disturb is on. Android only honours
+        // this once the app has Do Not Disturb access, so it is re-applied each time.
+        card.setBypassDnd(true)
+        nm.createNotificationChannel(card)
+        if (isNew) nm.deleteNotificationChannel(OLD_CARD_CHANNEL)
         if (nm.getNotificationChannel(TRIGGER_CHANNEL) == null) {
             val trigger = NotificationChannel(
                 TRIGGER_CHANNEL, "Routine triggers", NotificationManager.IMPORTANCE_LOW,

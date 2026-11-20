@@ -1,7 +1,9 @@
 # Shabbos Ends
 
-Shows when Shabbos or Yom Tov ends as an Android 16 Live Update, which Samsung
-puts in the Now Bar and on the Always On Display.
+Shows when Shabbos or Yom Tov ends as an Android 16 Live Update. Samsung puts
+it in the Now Bar and on the Always On Display; other Android 16 phones show
+Live Updates on the lock screen and Always On Display. Built and tested on a
+Samsung Galaxy; other brands are untested.
 
 Everything is calculated on the phone, so it works in flight mode.
 
@@ -53,9 +55,27 @@ Settings > Developer options > **Live notifications for all apps** and try again
 
 ## Optional: Shabbos automation
 
-This part is only for people who set their phone up for Shabbos automatically
-(flight mode on, Always On Display on, and so on). It is off by default and the
-card works without it.
+This part is only for people who set their phone up for Shabbos automatically.
+It is off by default and the card works without it. Everything in it runs at
+the same two moments: a set time before candle lighting, and a set time after
+Shabbos or Yom Tov ends.
+
+The options sit in two submenus, **Samsung** and **Pixel and other phones**.
+The one that matches the phone starts open.
+
+### "Pixel and other phones": built in, works on any Android 16 phone
+
+- **Do Not Disturb during Shabbos.** Needs Do Not Disturb access, which the
+  app asks for when you switch it on. On recent Android versions it shows up in
+  the phone's Modes list under the app's name, where you can adjust who may
+  still get through. It is only turned off afterwards if the app turned it on.
+- **Lock the screen orientation during Shabbos** (optional, separately).
+  Choose portrait, landscape or flipped landscape. Needs the "modify system
+  settings" permission. The phone's own setting is put back afterwards.
+
+The two "Try it" buttons run the start and the end on demand.
+
+### "Samsung": flight mode and the rest, through Samsung Routines
 
 The app can't turn on flight mode itself, but Samsung Routines can, and the app
 can tell it when. Turn on **Signal Samsung Routines** in the app, then make two
@@ -68,7 +88,7 @@ routines in Modes and Routines:
 
 The app sends the first signal a set time before candle lighting and the second
 a set time after Shabbos or Yom Tov ends. Each is a silent notification that
-disappears after two minutes. The two buttons in the app send them on demand,
+disappears after two minutes. The two "Try it" buttons send them on demand,
 for testing the routines.
 
 There is an optional third signal, **Send a later follow-up signal**, sent a

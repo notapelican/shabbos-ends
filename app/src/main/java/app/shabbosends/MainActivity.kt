@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
@@ -18,11 +19,14 @@ import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
@@ -46,6 +50,8 @@ class MainActivity : Activity() {
     private lateinit var israelBox: CheckBox
     private lateinit var routineBox: LinearLayout
     private lateinit var followBox: LinearLayout
+    private lateinit var rotationBox: LinearLayout
+    private lateinit var timingBox: LinearLayout
     private lateinit var upcomingView: TextView
 
     private var textColor = 0
@@ -159,45 +165,83 @@ class MainActivity : Activity() {
         page.addView(card {
             addView(label("OPTIONAL: SHABBOS AUTOMATION"))
             addView(text(
-                "For people who set their phone up for Shabbos automatically: flight mode on, " +
-                    "Always On Display on, and so on. The app sends a signal at the right times, " +
-                    "on Yom Tov as well, and a Samsung routine that you make does the switching."
+                "For people who set their phone up for Shabbos automatically. The app can turn on " +
+                    "Do Not Disturb and lock the screen orientation by itself, on any phone, at the " +
+                    "right times and on Yom Tov as well. On a Samsung it can also signal Samsung " +
+                    "Routines, for things like flight mode."
             ))
-            addView(hint("If you don't do this, leave it off. The card works without it."))
-            addView(Switch(context).apply {
+            addView(hint("If you don't do this, leave it all off. The card works without it."))
+
+            // Two submenus, one per kind of phone. The one for this phone starts open,
+            // and so does any that already has something switched on.
+            val onSamsung = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+            val samsungMenu = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+            val pixelMenu = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+
+            pixelMenu.addView(hint("Done by the app itself. Works on Samsung phones too."))
+            pixelMenu.addView(Switch(context).apply {
+                text = "Do Not Disturb during Shabbos"
+                textSize = 16f
+                isChecked = prefs.dndEnabled
+                setOnCheckedChangeListener { _, on ->
+                    prefs.dndEnabled = on
+                    if (!on) PhoneMode.endDnd(context, prefs)
+                    if (on && !PhoneMode.canSetDnd(context)) {
+                        open(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                    }
+                    automationChanged()
+                }
+            }, spaced())
+
+            pixelMenu.addView(Switch(context).apply {
+                text = "Lock the screen orientation during Shabbos"
+                textSize = 16f
+                isChecked = prefs.rotationEnabled
+                setOnCheckedChangeListener { _, on ->
+                    prefs.rotationEnabled = on
+                    if (!on) PhoneMode.endRotation(context, prefs)
+                    if (on && !PhoneMode.canSetRotation(context)) {
+                        open(
+                            Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS)
+                                .setData(Uri.parse("package:$packageName"))
+                        )
+                    }
+                    automationChanged()
+                }
+            }, spaced())
+            rotationBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+            rotationBox.addView(Spinner(context).apply {
+                adapter = ArrayAdapter(
+                    context, android.R.layout.simple_spinner_dropdown_item, PhoneMode.ROTATION_LABELS,
+                )
+                setSelection(prefs.rotationChoice.coerceIn(0, PhoneMode.ROTATION_LABELS.size - 1))
+                onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                        prefs.rotationChoice = position
+                    }
+                    override fun onNothingSelected(parent: AdapterView<*>?) {}
+                }
+            })
+            rotationBox.addView(hint("The phone's own setting is put back when Shabbos ends."))
+            pixelMenu.addView(rotationBox)
+
+            samsungMenu.addView(hint("For flight mode and anything else Samsung Routines can switch."))
+            samsungMenu.addView(Switch(context).apply {
                 text = "Signal Samsung Routines"
                 textSize = 16f
                 isChecked = prefs.routinesEnabled
                 setOnCheckedChangeListener { _, on ->
                     prefs.routinesEnabled = on
-                    routineBox.visibility = if (on) View.VISIBLE else View.GONE
-                    resync()
+                    automationChanged()
                 }
-            })
-            routineBox = LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                visibility = if (prefs.routinesEnabled) View.VISIBLE else View.GONE
-            }
-            routineBox.addView(numberRow("Start, minutes before candle lighting", prefs.modeOnMinutes, 0, 720) {
-                prefs.modeOnMinutes = it
-            })
-            routineBox.addView(numberRow("End, minutes after Shabbos ends", prefs.modeOffMinutes, 0, 720) {
-                prefs.modeOffMinutes = it
-            })
+            }, spaced())
+            routineBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
             routineBox.addView(text(
                 "In Modes and Routines, make two routines. For each, choose If > Notification received, " +
                     "pick Shabbos Ends, then Notification with specific keyword.\n\n" +
                     "Routine 1, keyword \"${Engine.START_TITLE}\": flight mode on, and anything else you want.\n\n" +
                     "Routine 2, keyword \"${Engine.END_TITLE}\": flight mode off, and the rest put back."
             ), spaced())
-            routineBox.addView(button("Send the start signal now") {
-                Engine.postTrigger(context, Engine.START_TITLE)
-                toast("Sent: ${Engine.START_TITLE}")
-            }, spaced())
-            routineBox.addView(button("Send the end signal now") {
-                Engine.postTrigger(context, Engine.END_TITLE)
-                toast("Sent: ${Engine.END_TITLE}")
-            })
 
             // Optional third signal, some time after Shabbos has ended.
             routineBox.addView(Switch(context).apply {
@@ -206,14 +250,10 @@ class MainActivity : Activity() {
                 isChecked = prefs.followEnabled
                 setOnCheckedChangeListener { _, on ->
                     prefs.followEnabled = on
-                    followBox.visibility = if (on) View.VISIBLE else View.GONE
-                    resync()
+                    automationChanged()
                 }
             }, spaced(16))
-            followBox = LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                visibility = if (prefs.followEnabled) View.VISIBLE else View.GONE
-            }
+            followBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
             followBox.addView(numberRow("Follow-up, minutes after Shabbos ends", prefs.followMinutes, 0, 720) {
                 prefs.followMinutes = it
             })
@@ -226,9 +266,35 @@ class MainActivity : Activity() {
                 toast("Sent: ${Engine.FOLLOW_TITLE}")
             }, spaced())
             routineBox.addView(followBox)
-            addView(routineBox)
+            samsungMenu.addView(routineBox)
+
+            addView(submenu("Samsung", onSamsung || prefs.routinesEnabled, samsungMenu), spaced(12))
+            addView(
+                submenu("Pixel and other phones", !onSamsung || prefs.dndEnabled || prefs.rotationEnabled, pixelMenu),
+                spaced(4),
+            )
+
+            // When it happens, and a way to try it. Shown once anything above is on.
+            timingBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+            timingBox.addView(label("WHEN"), spaced(16))
+            timingBox.addView(numberRow("Start, minutes before candle lighting", prefs.modeOnMinutes, 0, 720) {
+                prefs.modeOnMinutes = it
+            })
+            timingBox.addView(numberRow("End, minutes after Shabbos ends", prefs.modeOffMinutes, 0, 720) {
+                prefs.modeOffMinutes = it
+            })
+            timingBox.addView(button("Try it: start Shabbos mode now") {
+                Engine.startMode(context, prefs)
+                toast("Started. Press the other button to undo it.")
+            }, spaced())
+            timingBox.addView(button("Try it: end Shabbos mode now") {
+                Engine.endMode(context, prefs)
+                toast("Ended, and settings put back.")
+            })
+            addView(timingBox)
         })
 
+        showAutomationParts()
         fillManual(prefs.place)
     }
 
@@ -249,6 +315,22 @@ class MainActivity : Activity() {
             toast("Couldn't schedule: ${e.message}")
         }
         refresh()
+    }
+
+    /** An automation switch changed: show the parts that now apply, and reschedule. */
+    private fun automationChanged() {
+        showAutomationParts()
+        resync()
+    }
+
+    private fun showAutomationParts() {
+        fun show(view: View, visible: Boolean) {
+            view.visibility = if (visible) View.VISIBLE else View.GONE
+        }
+        show(rotationBox, prefs.rotationEnabled)
+        show(routineBox, prefs.routinesEnabled)
+        show(followBox, prefs.followEnabled)
+        show(timingBox, prefs.dndEnabled || prefs.rotationEnabled || prefs.routinesEnabled)
     }
 
     // ---- Location ----
@@ -391,7 +473,7 @@ class MainActivity : Activity() {
             })
         }
         if (!liveUpdatesOn) {
-            setupBox.addView(todo("Live Updates are off, so the card stays out of the Now Bar.", "Turn on") {
+            setupBox.addView(todo("Live Updates are off, so the card can't show on the lock screen or Always On Display.", "Turn on") {
                 open(
                     Intent(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
                         .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
@@ -406,10 +488,25 @@ class MainActivity : Activity() {
                 )
             })
         }
+        val dndReady = !prefs.dndEnabled || PhoneMode.canSetDnd(this)
+        val rotationReady = !prefs.rotationEnabled || PhoneMode.canSetRotation(this)
+        if (!dndReady) {
+            setupBox.addView(todo("Do Not Disturb is switched on below but not yet allowed.", "Allow") {
+                open(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+            })
+        }
+        if (!rotationReady) {
+            setupBox.addView(todo("The orientation lock is switched on below but not yet allowed.", "Allow") {
+                open(
+                    Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS)
+                        .setData(Uri.parse("package:$packageName"))
+                )
+            })
+        }
         if (!promotable) {
             setupBox.addView(text("This phone doesn't accept the card as a Live Update."))
         }
-        if (notificationsOn && liveUpdatesOn && batteryFree && promotable) {
+        if (notificationsOn && liveUpdatesOn && batteryFree && promotable && dndReady && rotationReady) {
             setupBox.addView(text("✓  Ready. The card appears on its own each week."))
         }
     }
@@ -460,6 +557,28 @@ class MainActivity : Activity() {
         setTextColor(accentColor)
         setPadding(0, dp(12), 0, dp(12))
         setOnClickListener(onClick)
+    }
+
+    /** A heading that opens and closes the options beneath it. */
+    private fun submenu(title: String, startOpen: Boolean, content: LinearLayout) = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        content.visibility = if (startOpen) View.VISIBLE else View.GONE
+        content.setPadding(dp(12), 0, 0, dp(8))
+        val heading = TextView(context).apply {
+            textSize = 17f
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, dp(12), 0, dp(12))
+        }
+        fun showState() {
+            heading.text = (if (content.visibility == View.VISIBLE) "▾  " else "▸  ") + title
+        }
+        heading.setOnClickListener {
+            content.visibility = if (content.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            showState()
+        }
+        showState()
+        addView(heading)
+        addView(content)
     }
 
     /** A search result: the place in large type, where it is underneath. */
