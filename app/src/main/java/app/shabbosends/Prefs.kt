@@ -30,15 +30,20 @@ class Prefs(context: Context) {
         get() = sp.getInt("candle", 18)
         set(v) { sp.edit().putInt("candle", v).apply() }
 
-    /** How long before candle lighting the card appears. */
+    /** How long before candle lighting the "ends" card appears. 0 means at candle lighting. */
     var leadMinutes: Int
-        get() = sp.getInt("lead", 120)
+        get() = sp.getInt("lead", 0)
         set(v) { sp.edit().putInt("lead", v).apply() }
 
     /** Whether the card shows candle lighting from midday on the eve. */
     var candleCardEnabled: Boolean
         get() = sp.getBoolean("candleCard", false)
         set(v) { sp.edit().putBoolean("candleCard", v).apply() }
+
+    /** When the candle lighting card appears on the eve, in minutes after midnight. */
+    var candleCardMinutes: Int
+        get() = sp.getInt("candleCardAt", 12 * 60)
+        set(v) { sp.edit().putInt("candleCardAt", v).apply() }
 
     /** Whether to post the two notifications that Samsung Routines listens for. */
     var routinesEnabled: Boolean

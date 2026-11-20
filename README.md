@@ -42,13 +42,14 @@ Settings > Developer options > **Live notifications for all apps** and try again
 
 ## What it does
 
-- The card appears 2 hours before candle lighting (adjustable) and removes
-  itself when Shabbos or Yom Tov ends.
+- The "Shabbos ends" card appears at candle lighting (adjustable to earlier)
+  and removes itself when Shabbos or Yom Tov ends.
 - A two-day Yom Tov, or Yom Tov running into Shabbos, is one card showing the
   final end time with its day, e.g. "Shabbos ends Sat 8:28".
-- Optionally ("Show candle lighting first"), the card appears at 12:00 pm on
+- Optionally ("Show candle lighting first"), the card appears earlier on
   Friday or the eve of Yom Tov showing "Candle lighting 4:16", then changes to
-  the end time at the usual point.
+  the end time at the usual point. It starts at 12:00 pm unless you pick
+  another time.
 - No notification from the app makes a sound or vibrates.
 - It reschedules itself after a reboot, a clock or time zone change, and an
   app update.

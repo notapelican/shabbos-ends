@@ -3,6 +3,7 @@ package app.shabbosends
 import android.Manifest
 import android.app.Activity
 import android.app.NotificationManager
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Typeface
@@ -14,6 +15,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.text.Editable
 import android.text.InputType
+import android.text.format.DateFormat
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
@@ -31,6 +33,7 @@ import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import java.util.Date
+import java.util.Locale
 
 class MainActivity : Activity() {
     private lateinit var prefs: Prefs
@@ -51,6 +54,7 @@ class MainActivity : Activity() {
     private lateinit var routineBox: LinearLayout
     private lateinit var followBox: LinearLayout
     private lateinit var rotationBox: LinearLayout
+    private lateinit var candleBox: LinearLayout
     private lateinit var timingBox: LinearLayout
     private lateinit var upcomingView: TextView
 
@@ -131,7 +135,10 @@ class MainActivity : Activity() {
 
         page.addView(card {
             addView(label("TIMING"))
-            addView(numberRow("Show the card this many minutes before candle lighting", prefs.leadMinutes, 0, 1440) {
+            addView(numberRow(
+                "Show \"Shabbos ends\" this many minutes before candle lighting (0 is at candle lighting)",
+                prefs.leadMinutes, 0, 1440,
+            ) {
                 prefs.leadMinutes = it
             })
             addView(numberRow("Candle lighting, minutes before sunset", prefs.candleMinutes, 0, 120) {
@@ -143,17 +150,44 @@ class MainActivity : Activity() {
                 isChecked = prefs.candleCardEnabled
                 setOnCheckedChangeListener { _, on ->
                     prefs.candleCardEnabled = on
+                    candleBox.visibility = if (on) View.VISIBLE else View.GONE
                     resync()
                 }
             }, spaced(16))
             addView(hint(
-                "From 12:00 pm on Friday, or on the eve of Yom Tov, the card shows the candle lighting " +
-                    "time. It changes to the end time at the point set above."
+                "On Friday, or on the eve of Yom Tov, the card shows the candle lighting time first. " +
+                    "It changes to the end time at the point set above."
             ))
-            addView(button("Preview the candle lighting card") {
+            candleBox = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = if (prefs.candleCardEnabled) View.VISIBLE else View.GONE
+            }
+            // The time it appears, picked on a clock.
+            candleBox.addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(
+                    text("Candle lighting card appears at"),
+                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+                )
+                addView(button(clock(prefs.candleCardMinutes)) { view ->
+                    val now = prefs.candleCardMinutes
+                    TimePickerDialog(
+                        context,
+                        { _, hour, minute ->
+                            prefs.candleCardMinutes = hour * 60 + minute
+                            (view as Button).text = clock(prefs.candleCardMinutes)
+                            resync()
+                        },
+                        now / 60, now % 60, DateFormat.is24HourFormat(context),
+                    ).show()
+                })
+            })
+            candleBox.addView(button("Preview the candle lighting card") {
                 val ok = Engine.postTest(context, candle = true)
                 toast(if (ok) "Sent. Lock the phone to see it." else "No upcoming times found")
             })
+            addView(candleBox)
         })
 
         page.addView(card {
@@ -659,6 +693,15 @@ class MainActivity : Activity() {
     private fun hideKeyboard() {
         getSystemService(InputMethodManager::class.java)
             .hideSoftInputFromWindow(searchField.windowToken, 0)
+    }
+
+    /** Minutes after midnight as a clock time, in the phone's 12- or 24-hour style. */
+    private fun clock(minutesAfterMidnight: Int): String {
+        val hour = minutesAfterMidnight / 60
+        val minute = minutesAfterMidnight % 60
+        if (DateFormat.is24HourFormat(this)) return String.format(Locale.US, "%02d:%02d", hour, minute)
+        val shown = if (hour % 12 == 0) 12 else hour % 12
+        return String.format(Locale.US, "%d:%02d %s", shown, minute, if (hour < 12) "am" else "pm")
     }
 
     private fun themeColor(attr: Int): Int {

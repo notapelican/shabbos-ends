@@ -62,9 +62,9 @@ object Engine {
             val place = prefs.place
             val life = current.ends.time - now
             val showAt = current.candleLighting.time - prefs.leadMinutes * MINUTE
-            // Optional: from midday on the eve, the same card shows candle lighting first.
+            // Optional: from a chosen time on the eve, the same card shows candle lighting first.
             val candleAt = if (prefs.candleCardEnabled) {
-                middayOf(current.candleLighting, place.timeZone)
+                timeOnDayOf(current.candleLighting, place.timeZone, prefs.candleCardMinutes)
             } else {
                 Long.MAX_VALUE
             }
@@ -222,12 +222,12 @@ object Engine {
         }
     }
 
-    /** 12:00 pm, in the place's own time zone, on the day candles are lit. */
-    private fun middayOf(date: Date, tz: TimeZone): Long =
+    /** A clock time, in the place's own time zone, on the day candles are lit. */
+    private fun timeOnDayOf(date: Date, tz: TimeZone, minutesAfterMidnight: Int): Long =
         Calendar.getInstance(tz).apply {
             time = date
-            set(Calendar.HOUR_OF_DAY, 12)
-            set(Calendar.MINUTE, 0)
+            set(Calendar.HOUR_OF_DAY, minutesAfterMidnight / 60)
+            set(Calendar.MINUTE, minutesAfterMidnight % 60)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
